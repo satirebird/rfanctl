@@ -21,11 +21,17 @@ use stm32f1xx_hal::{
     prelude::*,
     pac,
     timer::Timer,
+    timer::Tim2NoRemap,
+    pwm_input::*,
 };
 use embedded_hal::digital::v2::OutputPin;
 
 mod dbg;
 use dbg::Debug;
+
+mod fan;
+
+mod board;
 
 #[entry]
 fn main() -> ! {
@@ -40,7 +46,8 @@ fn main() -> ! {
     // HAL structs
     let mut flash = dp.FLASH.constrain();
     let mut rcc = dp.RCC.constrain();
- 
+    let mut dbg = dp.DBGMCU;
+
     // Freeze the configuration of all the clocks in the system and store the frozen frequencies in
     // `clocks`
     let clocks = rcc
@@ -52,6 +59,8 @@ fn main() -> ! {
  
     // Acquire the GPIOC peripheral
     let mut gpioc = dp.GPIOC.split(&mut rcc.apb2);
+    let mut gpioa = dp.GPIOA.split(&mut rcc.apb2);
+    let mut afio = dp.AFIO.constrain(&mut rcc.apb2);
  
     // Configure gpio C pin 13 as a push-pull output. The `crh` register is passed to the function
     // in order to configure the port. For pins 0-7, crl should be passed instead.
@@ -59,11 +68,41 @@ fn main() -> ! {
     // Configure the syst timer to trigger an update every second
     let mut timer = Timer::syst(cp.SYST, &clocks).start_count_down(10.hz());    
 
-    let mut dbg = Debug::new(cp.ITM, cp.DCB, cp.TPIU);
-    dbg.enable_swo(&clocks, 2.mhz());
-    dbg.tt();
-    //enable_swo(cp, &clocks, 2.mhz());
+    Debug::init(cp.ITM, cp.DCB, cp.TPIU);
+    Debug::enable_swo(&clocks, 2.mhz());
+    println!("Hello");
+    let i = 126;
+    println!("Test {}", i);
+    
 
+    let pins = (
+        gpioa.pa0.into_alternate_push_pull(&mut gpioa.crl),
+        gpioa.pa1.into_alternate_push_pull(&mut gpioa.crl),
+        //gpioa.pa2.into_alternate_push_pull(&mut gpioa.crl),
+        // gpioa.pa3.into_alternate_push_pull(&mut gpioa.crl),
+    );
+
+    let mut pwmout = Timer::tim2(dp.TIM2, &clocks, &mut rcc.apb1)
+        .pwm::<Tim2NoRemap, _, _, _>(pins, &mut afio.mapr, 25.khz()).0;
+    // Set the duty cycle of channel 0 to 50%
+    let max = pwmout.get_max_duty();
+    // PWM outputs are disabled by default
+    pwmout.enable();
+    pwmout.set_duty(max / 2);
+    pwmout.inval();
+
+    let pwm_in_pins= (gpioa.pa6, gpioa.pa7);
+
+    let t3 = Timer::tim3(dp.TIM3, &clocks, &mut rcc.apb1);
+    let pwm_in  = t3.pwm_input(pwm_in_pins, &mut afio.mapr, &mut dbg,
+                    Configuration::Frequency(10.khz()));
+
+//    pwm_in.inval();
+
+    //let _ = pwm_in.read_frequency(ReadMode::Instant, &clocks);
+
+    // PWM input: https://github.com/stm32-rs/stm32f1xx-hal/blob/master/examples/pwm_input.rs
+    // https://users.rust-lang.org/c/embedded/
     loop {
         block!(timer.wait()).unwrap();
         led.set_high().unwrap();
