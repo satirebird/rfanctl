@@ -29,9 +29,9 @@ use embedded_hal::digital::v2::OutputPin;
 mod dbg;
 use dbg::Debug;
 
-mod fan;
+//mod fan;
 
-mod board;
+//mod board;
 
 #[entry]
 fn main() -> ! {
@@ -89,7 +89,6 @@ fn main() -> ! {
     // PWM outputs are disabled by default
     pwmout.enable();
     pwmout.set_duty(max / 2);
-    pwmout.inval();
 
     let pwm_in_pins= (gpioa.pa6, gpioa.pa7);
 
