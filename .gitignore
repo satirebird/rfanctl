@@ -1,0 +1,8 @@
+**/*.rs.bk
+.#*
+.gdb_history
+.cortex-debug.*
+Cargo.lock
+target/
+.idea/
+.vscode/
